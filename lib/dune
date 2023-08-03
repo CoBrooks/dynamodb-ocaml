@@ -1,0 +1,13 @@
+(library
+ (public_name dynamodb_ocaml)
+ (modules request signing)
+ (libraries
+  base
+  unix
+  uri
+  digestif
+  yojson
+  cohttp-lwt-unix
+  ppx_deriving_yojson)
+ (preprocess
+  (pps ppx_deriving_yojson)))
