@@ -17,7 +17,7 @@
 
       duneVersion = "3";
 
-      buildInputs = with pkgs.ocamlPackages; [
+      propagatedBuildInputs = with pkgs.ocamlPackages; [
         cohttp
         cohttp-lwt-unix
         digestif
