@@ -1,6 +1,6 @@
 (lang dune 3.6)
 
-(name dynamodb_ocaml)
+(name dynamodb)
 
 (generate_opam_files true)
 
@@ -14,7 +14,7 @@
 (license MIT)
 
 (package
- (name dynamodb_ocaml)
+ (name dynamodb)
  (synopsis "A minimal library that implements a small subset of DynamoDB's Client API")
  (depends
   ocaml

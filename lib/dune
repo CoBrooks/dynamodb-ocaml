@@ -1,5 +1,5 @@
 (library
- (public_name dynamodb_ocaml)
+ (public_name dynamodb)
  (modules request signing)
  (libraries
   base
