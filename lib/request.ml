@@ -175,12 +175,19 @@ end
 module Scan = struct
   type t = { table_name : string }
 
-  let items_of_yojson items =
+  let items_of_yojson item =
     let inner = function
-      | `Assoc [ (key, `Assoc [ (_, value) ]) ] -> Ok (`Assoc [ (key, value) ])
-      | _ -> Error "unknown schema for Items"
+      | `Assoc properties ->
+          List.map
+            ~f:(fun (k, v) ->
+              match Util.dynamo_prop_to_yojson v with
+              | Ok v -> (k, v)
+              | Error _ -> (k, v))
+            properties
+          |> fun p -> Result.Ok (`Assoc p)
+      | _ -> Error "invalid item"
     in
-    match items with
+    match item with
     | `List items -> List.map ~f:inner items |> Result.all
     | _ -> Error "unknown schema for Items"
 
