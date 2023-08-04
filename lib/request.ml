@@ -10,9 +10,12 @@ and region =
        ~message:"Missing environment variable AWS_REGION or AWS_DEFAULT_REGION"
 
 module Util = struct
-  let ddb_request operation =
+  let ddb_request ?proto operation =
     let uri =
-      Printf.sprintf "https://dynamodb.%s.amazonaws.com" region |> Uri.of_string
+      Printf.sprintf "%s://dynamodb.%s.amazonaws.com"
+        (Option.value ~default:"http" proto)
+        region
+      |> Uri.of_string
     in
     ( `POST,
       uri,
@@ -49,7 +52,7 @@ module GetItem = struct
         Result.map ~f:(fun item -> { item }) (Util.dynamo_prop_to_yojson item)
     | _ -> Error "unrecognized property"
 
-  let request table_name (key_name, key_value) =
+  let request ?proto table_name (key_name, key_value) =
     let json =
       `Assoc
         [
@@ -58,7 +61,7 @@ module GetItem = struct
         ]
     in
     let payload = Yojson.Basic.to_string json in
-    let request = Util.ddb_request "GetItem" in
+    let request = Util.ddb_request ?proto "GetItem" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
     let* response, body =
@@ -99,13 +102,13 @@ module PutItem = struct
           (inner obj)
     | _ -> Error "Not a valid object"
 
-  let request table_name item =
+  let request ?proto table_name item =
     let payload =
       { table_name; item } |> to_dynamo_json
       |> Result.map ~f:Yojson.Basic.to_string
       |> Result.ok_or_failwith
     in
-    let request = Util.ddb_request "PutItem" in
+    let request = Util.ddb_request ?proto "PutItem" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
     let* response, body =
@@ -146,13 +149,13 @@ module DeleteItem = struct
           (inner obj)
     | _ -> Error "Not a valid object"
 
-  let request table_name key =
+  let request ?proto table_name key =
     let payload =
       { table_name; key } |> to_dynamo_json
       |> Result.map ~f:Yojson.Basic.to_string
       |> Result.ok_or_failwith
     in
-    let request = Util.ddb_request "DeleteItem" in
+    let request = Util.ddb_request ?proto "DeleteItem" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
     let* response, body =
@@ -189,9 +192,9 @@ module Scan = struct
 
   let to_json { table_name } = `Assoc [ ("TableName", `String table_name) ]
 
-  let request table_name =
+  let request ?proto table_name =
     let payload = { table_name } |> to_json |> Yojson.Basic.to_string in
-    let request = Util.ddb_request "Scan" in
+    let request = Util.ddb_request ?proto "Scan" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
     let* response, body =
