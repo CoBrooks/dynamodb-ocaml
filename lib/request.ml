@@ -3,6 +3,7 @@ open Lwt.Syntax
 
 let secret_key = Sys.getenv_exn "AWS_SECRET_ACCESS_KEY"
 and access_key = Sys.getenv_exn "AWS_ACCESS_KEY_ID"
+and session_token = Sys.getenv "AWS_SESSION_TOKEN"
 
 and region =
   Option.first_some (Sys.getenv "AWS_REGION") (Sys.getenv "AWS_DEFAULT_REGION")
@@ -26,7 +27,7 @@ module Util = struct
 
   let sign_request payload =
     Signing.sign_request ~payload ~service:"dynamodb" ~region ~access_key
-      ~secret_key
+      ~session_token ~secret_key
 
   let dynamo_prop_to_yojson = function
     | `Assoc [ ("S", `String s) ] -> Ok (`String s)

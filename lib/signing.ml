@@ -18,8 +18,8 @@ module Hash = struct
   let sha256_hex ?key str = _sha256 ?key str |> Digestif.SHA256.to_hex
 end
 
-let sign_request ~access_key ~secret_key ~service ~region ~payload
-    (meth, uri, headers) =
+let sign_request ~access_key ~secret_key ~session_token ~service ~region
+    ~payload (meth, uri, headers) =
   let host = Printf.sprintf "%s.%s.amazonaws.com" service region in
   let get_signature_key key date region service =
     let sign msg key = Hash.sha256 ~key msg in
@@ -37,6 +37,11 @@ let sign_request ~access_key ~secret_key ~service ~region ~payload
     |> List.map (fun (k, v) -> String.concat "=" [ k; v ])
     |> List.sort String.compare |> String.concat "&"
   in
+
+  let security_token_header =
+    Option.map (fun token -> ("x-amz-security-token", token)) session_token
+  in
+  let headers = Option.to_list security_token_header @ headers in
 
   let canonical_uri = "/"
   and canonical_querystring = encode_query (Uri.query uri)
