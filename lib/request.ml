@@ -46,12 +46,25 @@ module Util = struct
 end
 
 module GetItem = struct
-  type t = { item : Yojson.Basic.t }
+  let item_of_yojson = function
+    | `Assoc [] -> Ok None
+    | `Assoc properties ->
+        List.map
+          ~f:(fun (k, v) ->
+            match Util.dynamo_prop_to_yojson v with
+            | Ok v -> (k, v)
+            | Error _ -> (k, v))
+          properties
+        |> fun p -> Result.Ok (Some (`Assoc p))
+    | s ->
+        Error
+          (Printf.sprintf "unrecognized property: %s" (Yojson.Safe.to_string s))
 
-  let of_yojson = function
-    | `Assoc [ ("Item", item) ] ->
-        Result.map ~f:(fun item -> { item }) (Util.dynamo_prop_to_yojson item)
-    | _ -> Error "unrecognized property"
+  type t = {
+    item : Yojson.Safe.t option;
+        [@default None] [@key "Item"] [@of_yojson item_of_yojson]
+  }
+  [@@deriving yojson]
 
   let request ?proto table_name (key_name, key_value) =
     let json =
@@ -61,7 +74,7 @@ module GetItem = struct
           ("Key", `Assoc [ (key_name, `Assoc [ ("S", `String key_value) ]) ]);
         ]
     in
-    let payload = Yojson.Basic.to_string json in
+    let payload = Yojson.Safe.to_string json in
     let request = Util.ddb_request ?proto "GetItem" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
@@ -73,13 +86,13 @@ module GetItem = struct
     let* body = Cohttp_lwt.Body.to_string body in
     match response.status with
     | `OK ->
-        let item = Yojson.Basic.from_string body |> of_yojson in
-        Lwt.return item
+        let item = Yojson.Safe.from_string body |> of_yojson in
+        Lwt.return_ok item
     | _ -> Lwt.return_error body
 end
 
 module PutItem = struct
-  type t = { table_name : string; item : Yojson.Basic.t }
+  type t = { table_name : string; item : Yojson.Safe.t }
 
   let to_dynamo_json { table_name; item } =
     let inner (`Assoc obj) =
@@ -93,7 +106,7 @@ module PutItem = struct
       in
       Result.all props
       |> Result.map ~f:(fun obj ->
-             List.fold obj ~init:(`Assoc []) ~f:Yojson.Basic.Util.combine)
+             List.fold obj ~init:(`Assoc []) ~f:Yojson.Safe.Util.combine)
     in
     match item with
     | `Assoc _ as obj ->
@@ -106,7 +119,7 @@ module PutItem = struct
   let request ?proto table_name item =
     let payload =
       { table_name; item } |> to_dynamo_json
-      |> Result.map ~f:Yojson.Basic.to_string
+      |> Result.map ~f:Yojson.Safe.to_string
       |> Result.ok_or_failwith
     in
     let request = Util.ddb_request ?proto "PutItem" in
@@ -120,13 +133,13 @@ module PutItem = struct
     let* body = Cohttp_lwt.Body.to_string body in
     match response.status with
     | `OK ->
-        let item = Yojson.Basic.from_string body in
+        let item = Yojson.Safe.from_string body in
         Lwt.return_ok item
     | _ -> Lwt.return_error body
 end
 
 module DeleteItem = struct
-  type t = { table_name : string; key : Yojson.Basic.t }
+  type t = { table_name : string; key : Yojson.Safe.t }
 
   let to_dynamo_json { table_name; key } =
     let inner (`Assoc obj) =
@@ -140,7 +153,7 @@ module DeleteItem = struct
       in
       Result.all props
       |> Result.map ~f:(fun obj ->
-             List.fold obj ~init:(`Assoc []) ~f:Yojson.Basic.Util.combine)
+             List.fold obj ~init:(`Assoc []) ~f:Yojson.Safe.Util.combine)
     in
     match key with
     | `Assoc _ as obj ->
@@ -153,7 +166,7 @@ module DeleteItem = struct
   let request ?proto table_name key =
     let payload =
       { table_name; key } |> to_dynamo_json
-      |> Result.map ~f:Yojson.Basic.to_string
+      |> Result.map ~f:Yojson.Safe.to_string
       |> Result.ok_or_failwith
     in
     let request = Util.ddb_request ?proto "DeleteItem" in
@@ -167,7 +180,7 @@ module DeleteItem = struct
     let* body = Cohttp_lwt.Body.to_string body in
     match response.status with
     | `OK ->
-        let item = Yojson.Basic.from_string body in
+        let item = Yojson.Safe.from_string body in
         Lwt.return_ok item
     | _ -> Lwt.return_error body
 end
@@ -201,7 +214,7 @@ module Scan = struct
   let to_json { table_name } = `Assoc [ ("TableName", `String table_name) ]
 
   let request ?proto table_name =
-    let payload = { table_name } |> to_json |> Yojson.Basic.to_string in
+    let payload = { table_name } |> to_json |> Yojson.Safe.to_string in
     let request = Util.ddb_request ?proto "Scan" in
     let meth, uri, headers = Util.sign_request payload request in
     let body = Cohttp_lwt.Body.of_string payload in
